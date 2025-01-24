@@ -292,7 +292,7 @@ class Plugin {
   }
 
   compileFunctionDeadLetterQueue (functionName, queueConfig) {
-    const queueProps = { QueueName: '' }
+    var queueProps = { QueueName: '' }
 
     if (typeof queueConfig === 'string' || queueConfig === null) {
       queueProps.QueueName = (queueConfig || '').trim()
