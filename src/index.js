@@ -296,6 +296,8 @@ class Plugin {
 
     if (typeof queueConfig === 'string' || queueConfig === null) {
       queueProps.QueueName = (queueConfig || '').trim()
+    } else if (queueConfig === true) {
+      queueProps = { }
     } else if (typeof queueConfig === 'object') {
       Object.keys(queueConfig).forEach(key => {
         if (Object.prototype.hasOwnProperty.call(queueConfig, key)) {
@@ -308,7 +310,7 @@ class Plugin {
       )
     }
 
-    if (queueProps.QueueName.length < 1) {
+    if (queueProps.QueueName !== undefined && queueProps.QueueName.length < 1) {
       throw new Error(
         `Function property ${functionName}.deadLetter.sqs queueName must contain one or more characters.`
       )
@@ -318,6 +320,7 @@ class Plugin {
     const queueLogicalId = this.getLogicalIdForDlQueue(functionName)
     const queuePolicyLogicalId = this.getLogicalIdForDlQueuePolicy(functionName)
     const resources = this.serverless.service.provider.compiledCloudFormationTemplate.Resources
+    const outputs = this.serverless.service.provider.compiledCloudFormationTemplate.Outputs
 
     const queueResource = {
       Type: 'AWS::SQS::Queue',
@@ -343,7 +346,6 @@ class Plugin {
               Effect: 'Allow',
               Principal: { AWS: '*' },
               Action: ['SQS:SendMessage'],
-
               Resource: { 'Fn::GetAtt': [queueLogicalId, 'Arn'] },
               Condition: {
                 ArnEquals: {
@@ -360,6 +362,17 @@ class Plugin {
 
     resources[queueLogicalId] = queueResource
     resources[queuePolicyLogicalId] = queuePolicyResource
+
+    if (resources['IamRoleLambdaExecution'] !== undefined) {
+        const lambdaPolicy = {
+            Effect: 'Allow',
+            Action: ['SQS:SendMessage'],
+            Resource: [{ 'Fn::GetAtt': [queueLogicalId, 'Arn'] }],
+        };
+        resources['IamRoleLambdaExecution']['Properties']['Policies'][0]['PolicyDocument']['Statement'].push(lambdaPolicy)
+    }
+
+    outputs[queueLogicalId] = { Value: { Ref: queueLogicalId } }
   }
 
   compileFunctionDeadLetterTopic (functionName, topicConfig) {
